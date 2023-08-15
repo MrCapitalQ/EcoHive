@@ -1,4 +1,5 @@
-﻿using MrCapitalQ.EcoHive.EcoBee.Dtos;
+﻿using Microsoft.Extensions.Logging;
+using MrCapitalQ.EcoHive.EcoBee.Dtos;
 using MrCapitalQ.EcoHive.EcoBee.Exceptions;
 using System.Net.Http.Json;
 
@@ -7,19 +8,31 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
     public class EcoBeePinAuthProvider : IEcoBeePinAuthProvider
     {
         private readonly HttpClient _httpClient;
+        private readonly IDateTimeProvider _dateTimeProvider;
         private readonly IEcoBeeAuthCache _cache;
         private readonly string _apiKey;
+        private readonly ILogger<EcoBeePinAuthProvider> _logger;
+
         private EcoBeeAuthTokenData? _authData;
 
-        public EcoBeePinAuthProvider(IEcoBeeAuthCache cache, string apiKey)
-            : this(new HttpClient(), cache, apiKey)
+        public EcoBeePinAuthProvider(IDateTimeProvider dateTimeProvider,
+            IEcoBeeAuthCache cache,
+            string apiKey,
+            ILogger<EcoBeePinAuthProvider> logger)
+            : this(new HttpClient(), dateTimeProvider, cache, apiKey, logger)
         { }
 
-        public EcoBeePinAuthProvider(HttpClient httpClient, IEcoBeeAuthCache cache, string apiKey)
+        public EcoBeePinAuthProvider(HttpClient httpClient,
+            IDateTimeProvider dateTimeProvider,
+            IEcoBeeAuthCache cache,
+            string apiKey,
+            ILogger<EcoBeePinAuthProvider> logger)
         {
             _httpClient = httpClient;
+            _dateTimeProvider = dateTimeProvider;
             _cache = cache;
             _apiKey = apiKey;
+            _logger = logger;
         }
 
         public async Task<bool> IsAuthenticated()
@@ -39,7 +52,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
                 Pin = pinResponse.EcobeePin,
                 AuthCode = pinResponse.Code,
                 Scope = pinResponse.Scope,
-                Expiration = DateTimeOffset.UtcNow.AddSeconds(pinResponse.ExpiresIn)
+                Expiration = _dateTimeProvider.UtcNow().AddMinutes(pinResponse.ExpiresIn)
             };
         }
 
@@ -53,8 +66,11 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
         {
             await EnsureCacheRestoredAsync();
 
-            if (!string.IsNullOrEmpty(_authData?.RefreshToken) && _authData.Expiration < DateTimeOffset.UtcNow)
+            if (!string.IsNullOrEmpty(_authData?.RefreshToken) && _authData.Expiration < _dateTimeProvider.UtcNow())
+            {
+                _logger.LogInformation("Refreshing access token. Token expired on {expiration}.", _authData.Expiration);
                 await RefreshAccessTokenAsync(_authData.RefreshToken);
+            }
 
             return _authData?.AccessToken ?? string.Empty;
         }
@@ -94,8 +110,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
             {
                 AccessToken = tokenResponse.AccessToken,
                 RefreshToken = tokenResponse.RefreshToken,
-                Expiration = DateTimeOffset.UtcNow.AddMinutes(tokenResponse.ExpiresIn)
-
+                Expiration = _dateTimeProvider.UtcNow().AddSeconds(tokenResponse.ExpiresIn)
             };
             await _cache.SetAysnc(_authData);
         }

@@ -17,6 +17,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore
             services.AddScoped<IEcoBeeAuthCache, EcoBeeAuthCache>();
 
             services.AddHttpClient();
+            services.AddTransient<IDateTimeProvider, DateTimeProvider>();
             services.AddScoped(s =>
             {
                 var configuration = s.GetRequiredService<IConfiguration>();

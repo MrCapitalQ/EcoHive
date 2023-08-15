@@ -1,4 +1,5 @@
-﻿using Moq;
+﻿using Microsoft.Extensions.Logging;
+using Moq;
 using MrCapitalQ.EcoHive.EcoBee.Auth;
 using MrCapitalQ.EcoHive.EcoBee.Exceptions;
 using System.Net;
@@ -12,7 +13,10 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
         private const string Scope = "fake_scope";
         private readonly Mock<HttpMessageHandler> _httpMessageHandler;
         private readonly HttpClient _httpClient;
+        private readonly DateTimeOffset _now = DateTimeOffset.UtcNow;
+        private readonly Mock<IDateTimeProvider> _dateTimeProvider;
         private readonly Mock<IEcoBeeAuthCache> _cache;
+        private readonly Mock<ILogger<EcoBeePinAuthProvider>> _logger;
 
         private readonly EcoBeePinAuthProvider _ecoBeePinAuthProvider;
 
@@ -20,9 +24,12 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
         {
             _httpMessageHandler = new();
             _httpClient = new(_httpMessageHandler.Object);
+            _dateTimeProvider = new();
+            _dateTimeProvider.Setup(x => x.UtcNow()).Returns(_now);
             _cache = new();
+            _logger = new();
 
-            _ecoBeePinAuthProvider = new EcoBeePinAuthProvider(_httpClient, _cache.Object, ApiKey);
+            _ecoBeePinAuthProvider = new EcoBeePinAuthProvider(_httpClient, _dateTimeProvider.Object, _cache.Object, ApiKey, _logger.Object);
         }
 
         [Fact]
@@ -41,7 +48,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             {
                 AccessToken = "fake_access_token",
                 RefreshToken = "fake_refresh_token",
-                Expiration = DateTime.UtcNow
+                Expiration = _now.AddTicks(1)
             };
             _cache.Setup(x => x.GetAysnc()).ReturnsAsync(authData);
 
@@ -59,15 +66,21 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             {
                 ecobeePin = "1234-56789",
                 code = "fake_code",
-                scope = "fake_scope"
+                scope = "fake_scope",
+                expires_in = 9
             };
             _httpMessageHandler.SetupSend(HttpMethod.Get, requestUri).ReturnsResponse(HttpStatusCode.OK, JsonSerializer.Serialize(responseBody));
+            var expected = new PinData
+            {
+                Pin = responseBody.ecobeePin,
+                AuthCode = responseBody.code,
+                Scope = responseBody.scope,
+                Expiration = _now.AddMinutes(responseBody.expires_in)
+            };
 
-            var result = await _ecoBeePinAuthProvider.GetPinAsync(Scope);
+            var actual = await _ecoBeePinAuthProvider.GetPinAsync(Scope);
 
-            Assert.Equal(responseBody.ecobeePin, result.Pin);
-            Assert.Equal(responseBody.code, result.AuthCode);
-            Assert.Equal(responseBody.scope, result.Scope);
+            Assert.Equal(expected, actual);
             _httpMessageHandler.VerifySend(HttpMethod.Get, requestUri, Times.Once);
         }
 
@@ -135,7 +148,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             {
                 AccessToken = "fake_access_token",
                 RefreshToken = "fake_refresh_token",
-                Expiration = DateTimeOffset.MinValue
+                Expiration = _now.AddTicks(-1)
             };
             _cache.Setup(x => x.GetAysnc()).ReturnsAsync(authData);
             var tokenResponseBody = new
@@ -159,7 +172,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             {
                 AccessToken = "fake_access_token",
                 RefreshToken = "fake_refresh_token",
-                Expiration = DateTimeOffset.MaxValue
+                Expiration = _now.AddTicks(1)
             };
             _cache.Setup(x => x.GetAysnc()).ReturnsAsync(authData);
             var tokenResponseBody = new
@@ -191,7 +204,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             {
                 AccessToken = "fake_access_token",
                 RefreshToken = "fake_refresh_token",
-                Expiration = DateTime.UtcNow
+                Expiration = _now.AddTicks(-1)
             };
             _cache.Setup(x => x.GetAysnc()).ReturnsAsync(authData);
             var tokenResponseBody = new
