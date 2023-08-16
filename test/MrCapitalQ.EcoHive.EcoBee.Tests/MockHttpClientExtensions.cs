@@ -4,7 +4,7 @@ using System.Net;
 
 namespace MrCapitalQ.EcoHive.EcoBee.Tests
 {
-    public static class MockHttpClientExtensions
+    internal static class MockHttpClientExtensions
     {
         private const string SendAsyncMethodName = "SendAsync";
 
