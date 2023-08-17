@@ -11,6 +11,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
     {
         private const string ApiKey = "fake_api_key";
         private const string Scope = "fake_scope";
+
         private readonly Mock<HttpMessageHandler> _httpMessageHandler;
         private readonly HttpClient _httpClient;
         private readonly DateTimeOffset _now = DateTimeOffset.UtcNow;

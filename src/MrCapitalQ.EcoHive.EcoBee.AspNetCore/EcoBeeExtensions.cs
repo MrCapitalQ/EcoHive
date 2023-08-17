@@ -28,6 +28,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore
             });
             services.AddScoped<IEcoBeeAuthProvider>(s => s.GetRequiredService<EcoBeePinAuthProvider>());
             services.AddScoped<IEcoBeePinAuthProvider>(s => s.GetRequiredService<EcoBeePinAuthProvider>());
+            services.AddScoped<IEcoBeeThermostatClient, EcoBeeThermostatClient>();
 
             return services;
         }
