@@ -44,7 +44,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore.Tests
         }
 
         [Fact]
-        public void SetAsync_CachesWithExpiration()
+        public async Task SetAsync_CachesWithExpiration()
         {
             var value = new EcoBeeAuthTokenData
             {
@@ -55,7 +55,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore.Tests
             TestCacheEntry cacheEntry = new(AuthTokenCacheKey);
             _memoryCache.Setup(c => c.CreateEntry(It.IsAny<object>())).Returns(cacheEntry);
 
-            _authCache.SetAsync(value, expiration);
+            await _authCache.SetAsync(value, expiration);
 
             Assert.Equal(value, cacheEntry.Value);
             Assert.Equal(expiration, cacheEntry.AbsoluteExpirationRelativeToNow);

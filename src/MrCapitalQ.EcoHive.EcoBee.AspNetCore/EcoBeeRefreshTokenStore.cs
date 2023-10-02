@@ -12,7 +12,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore
             _dbContext = dbContext;
         }
 
-        public async Task<string> GetAsync()
+        public async Task<string?> GetAsync()
         {
             var cached = await _dbContext.RefreshTokens
                 .OrderByDescending(x => x.Id)

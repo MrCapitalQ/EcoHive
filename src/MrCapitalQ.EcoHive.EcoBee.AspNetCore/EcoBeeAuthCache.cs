@@ -14,7 +14,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore
             _memoryCache = memoryCache;
         }
 
-        public Task<EcoBeeAuthTokenData> GetAsync()
+        public Task<EcoBeeAuthTokenData?> GetAsync()
         {
             return Task.FromResult(_memoryCache.Get<EcoBeeAuthTokenData>(AuthTokenCacheKey));
         }

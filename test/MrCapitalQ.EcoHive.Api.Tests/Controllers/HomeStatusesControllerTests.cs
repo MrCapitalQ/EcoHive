@@ -24,7 +24,7 @@ namespace MrCapitalQ.EcoHive.Api.Tests.Controllers
         }
 
         [Fact]
-        public async Task GetPinAsync_Home_CallsAuthProvider()
+        public async Task UpdateHomeStatusAsync_Home_RequestsThermostatUpdate()
         {
             var result = await _controller.UpdateHomeStatusAsync(OccupancyStatus.Home);
 
@@ -33,7 +33,7 @@ namespace MrCapitalQ.EcoHive.Api.Tests.Controllers
         }
 
         [Fact]
-        public async Task GetPinAsync_Away_CallsAuthProvider()
+        public async Task UpdateHomeStatusAsync_Away_RequestsThermostatUpdate()
         {
             var result = await _controller.UpdateHomeStatusAsync(OccupancyStatus.Away);
 
@@ -42,7 +42,7 @@ namespace MrCapitalQ.EcoHive.Api.Tests.Controllers
         }
 
         [Fact]
-        public async Task GetPinAsync_Unknown_CallsAuthProvider()
+        public async Task UpdateHomeStatusAsync_Unknown_DoesNothing()
         {
             var result = await _controller.UpdateHomeStatusAsync((OccupancyStatus)100);
 

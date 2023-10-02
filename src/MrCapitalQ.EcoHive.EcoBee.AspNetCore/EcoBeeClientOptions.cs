@@ -7,6 +7,6 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore
     public record EcoBeeClientOptions
     {
         [Required]
-        public string ApiKey { get; set; }
+        public required string ApiKey { get; init; }
     }
 }
