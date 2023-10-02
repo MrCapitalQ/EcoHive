@@ -1,5 +1,8 @@
-﻿namespace MrCapitalQ.EcoHive.EcoBee
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace MrCapitalQ.EcoHive.EcoBee
 {
+    [ExcludeFromCodeCoverage]
     public class DateTimeProvider : IDateTimeProvider
     {
         public DateTimeOffset UtcNow()

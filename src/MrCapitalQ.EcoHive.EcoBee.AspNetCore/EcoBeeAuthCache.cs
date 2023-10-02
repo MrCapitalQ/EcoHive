@@ -1,48 +1,28 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.Extensions.Caching.Memory;
 using MrCapitalQ.EcoHive.EcoBee.Auth;
 
 namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore
 {
     public class EcoBeeAuthCache : IEcoBeeAuthCache
     {
-        private readonly EcoBeeCacheContext _dbContext;
+        private const string AuthTokenCacheKey = "EcoBeeAuthToken";
 
-        public EcoBeeAuthCache(EcoBeeCacheContext dbContext)
+        private readonly IMemoryCache _memoryCache;
+
+        public EcoBeeAuthCache(IMemoryCache memoryCache)
         {
-            _dbContext = dbContext;
+            _memoryCache = memoryCache;
         }
 
-        public async Task<EcoBeeAuthTokenData> GetAysnc()
+        public Task<EcoBeeAuthTokenData> GetAsync()
         {
-            var cached = await _dbContext.AuthTokens
-                .OrderByDescending(x => x.Id)
-                .FirstOrDefaultAsync();
-
-            if (cached is null)
-                return null;
-
-            return new()
-            {
-                AccessToken = cached.AccessToken,
-                RefreshToken = cached.RefreshToken,
-                Expiration = cached.Expiration
-            };
+            return Task.FromResult(_memoryCache.Get<EcoBeeAuthTokenData>(AuthTokenCacheKey));
         }
 
-        public async Task SetAysnc(EcoBeeAuthTokenData value)
+        public Task SetAsync(EcoBeeAuthTokenData value, TimeSpan expirationFromNow)
         {
-            await _dbContext.AuthTokens.ExecuteDeleteAsync();
-
-            if (value is null)
-                return;
-
-            _dbContext.AuthTokens.Add(new()
-            {
-                AccessToken = value.AccessToken,
-                RefreshToken = value.RefreshToken,
-                Expiration = value.Expiration
-            });
-            await _dbContext.SaveChangesAsync();
+            _memoryCache.Set(AuthTokenCacheKey, value, expirationFromNow);
+            return Task.CompletedTask;
         }
     }
 }

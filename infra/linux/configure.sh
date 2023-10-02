@@ -3,7 +3,7 @@ chmod +x /var/www/EcoHive/MrCapitalQ.EcoHive.Api
 
 # Execute efbundle to create and update database.
 chmod +x /var/www/EcoHive/efbundle
-/var/www/EcoHive/efbundle --connection "Data Source=/var/www/EcoHive/ecobeeCache.db"
+/var/www/EcoHive/efbundle --connection "Data Source=/var/www/EcoHive/ecobee.db"
 chmod -R a+rw /var/www/EcoHive
 
 # Optionally, stop and disable existing service.

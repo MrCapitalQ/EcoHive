@@ -1,109 +1,86 @@
-using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Primitives;
+using Moq;
 using MrCapitalQ.EcoHive.EcoBee.Auth;
 
 namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore.Tests
 {
-    public sealed class EcoBeeAuthCacheTests : IDisposable
+    public class EcoBeeAuthCacheTests
     {
-        private readonly SqliteConnection _connection;
-        private readonly EcoBeeCacheContext _dbContext;
+        private const string AuthTokenCacheKey = "EcoBeeAuthToken";
+        private readonly Mock<IMemoryCache> _memoryCache;
 
-        private readonly EcoBeeAuthCache _cache;
+        private readonly EcoBeeAuthCache _authCache;
 
         public EcoBeeAuthCacheTests()
         {
-            _connection = new SqliteConnection("Filename=:memory:");
-            _connection.Open();
-            var options = new DbContextOptionsBuilder<EcoBeeCacheContext>()
-                .UseSqlite(_connection)
-                .Options;
-            _dbContext = new EcoBeeCacheContext(options);
-            _dbContext.Database.EnsureCreated();
+            _memoryCache = new();
 
-            _cache = new EcoBeeAuthCache(_dbContext);
+            _authCache = new(_memoryCache.Object);
         }
 
         [Fact]
-        public async Task GetAsync_NoAuthTokenEntries_ReturnsNull()
+        public async Task GetAsync_NothingCachedOrExpired_ReturnsNull()
         {
-            var actual = await _cache.GetAysnc();
+            var actual = await _authCache.GetAsync();
 
             Assert.Null(actual);
         }
 
         [Fact]
-        public async Task GetAsync_WithAuthTokenEntry_ReturnsCached()
+        public async Task GetAsync_DataCached_ReturnsCachedData()
         {
-            var expected = new EcoBeeAuthTokenData()
+            var data = new EcoBeeAuthTokenData
             {
                 AccessToken = "fake_access_token",
-                RefreshToken = "fake_refresh_token",
-                Expiration = DateTimeOffset.UtcNow
+                TokenType = "bearer"
             };
-            _dbContext.AuthTokens.Add(new()
-            {
-                AccessToken = expected.AccessToken,
-                RefreshToken = expected.RefreshToken,
-                Expiration = expected.Expiration
-            });
-            await _dbContext.SaveChangesAsync();
-            _dbContext.ChangeTracker.Clear();
+            object? cachedData = data;
+            _memoryCache.Setup(c => c.TryGetValue(AuthTokenCacheKey, out cachedData)).Returns(true);
 
-            var actual = await _cache.GetAysnc();
+            var actual = await _authCache.GetAsync();
 
-            Assert.Equal(expected, actual);
+            Assert.Equal(data, actual);
         }
 
         [Fact]
-        public async Task SetAsync_WithExistingAuthTokenEntry_ClearsExisting()
+        public void SetAsync_CachesWithExpiration()
         {
-            var existing = new EcoBeeAuthTokenData()
+            var value = new EcoBeeAuthTokenData
             {
                 AccessToken = "fake_access_token",
-                RefreshToken = "fake_refresh_token",
-                Expiration = DateTimeOffset.UtcNow
+                TokenType = "bearer"
             };
-            _dbContext.AuthTokens.Add(new()
-            {
-                AccessToken = existing.AccessToken,
-                RefreshToken = existing.RefreshToken,
-                Expiration = existing.Expiration
-            });
-            await _dbContext.SaveChangesAsync();
-            _dbContext.ChangeTracker.Clear();
+            var expiration = TimeSpan.FromSeconds(10);
+            TestCacheEntry cacheEntry = new(AuthTokenCacheKey);
+            _memoryCache.Setup(c => c.CreateEntry(It.IsAny<object>())).Returns(cacheEntry);
 
-            await _cache.SetAysnc(null);
+            _authCache.SetAsync(value, expiration);
 
-            Assert.False(await _dbContext.AuthTokens.AnyAsync());
+            Assert.Equal(value, cacheEntry.Value);
+            Assert.Equal(expiration, cacheEntry.AbsoluteExpirationRelativeToNow);
+            _memoryCache.Verify(c => c.CreateEntry(AuthTokenCacheKey));
         }
 
-        [Fact]
-        public async Task SetAsync_NonNullValue_SavesEntry()
+        private class TestCacheEntry : ICacheEntry
         {
-            var data = new EcoBeeAuthTokenData()
+            public TestCacheEntry(string key)
             {
-                AccessToken = "fake_access_token",
-                RefreshToken = "fake_refresh_token",
-                Expiration = DateTimeOffset.UtcNow
-            };
-            var expected = new AuthToken()
-            {
-                Id = 1,
-                AccessToken = data.AccessToken,
-                RefreshToken = data.RefreshToken,
-                Expiration = data.Expiration
-            };
+                Key = key;
+            }
 
-            await _cache.SetAysnc(data);
+            public DateTimeOffset? AbsoluteExpiration { get; set; }
+            public TimeSpan? AbsoluteExpirationRelativeToNow { get; set; }
+            public IList<IChangeToken> ExpirationTokens => new List<IChangeToken>();
+            public object Key { get; }
+            public IList<PostEvictionCallbackRegistration> PostEvictionCallbacks => new List<PostEvictionCallbackRegistration>();
+            public CacheItemPriority Priority { get; set; }
+            public long? Size { get; set; }
+            public TimeSpan? SlidingExpiration { get; set; }
+            public object? Value { get; set; }
 
-            var record = await _dbContext.AuthTokens.SingleAsync();
-            Assert.Equal(expected, record);
-        }
-
-        public void Dispose()
-        {
-            _connection.Dispose();
+            public void Dispose()
+            { }
         }
     }
 }

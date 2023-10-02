@@ -1,5 +1,4 @@
 using Moq;
-using MrCapitalQ.EcoHive.EcoBee.Auth;
 using MrCapitalQ.EcoHive.EcoBee.Functions;
 using System.Net;
 using System.Text.Json;
@@ -11,7 +10,6 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests
         private readonly Uri _updateUri = new("https://api.ecobee.com/1/thermostat?format=json");
         private readonly Mock<HttpMessageHandler> _httpMessageHandler;
         private readonly HttpClient _httpClient;
-        private readonly Mock<IEcoBeeAuthProvider> _authProvider;
 
         private readonly EcoBeeThermostatClient _ecoBeeThermostatClient;
 
@@ -19,9 +17,8 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests
         {
             _httpMessageHandler = new();
             _httpClient = new HttpClient(_httpMessageHandler.Object);
-            _authProvider = new();
 
-            _ecoBeeThermostatClient = new(_httpClient, _authProvider.Object);
+            _ecoBeeThermostatClient = new(_httpClient);
         }
 
         [Fact]
@@ -40,8 +37,6 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests
             Assert.Equal(expected, actual);
             _httpMessageHandler.VerifySend(HttpMethod.Post, _updateUri, Times.Once);
             _httpMessageHandler.VerifyNoOtherCalls();
-            _authProvider.Verify(x => x.GetAccessTokenAsync(), Times.Once);
-            _authProvider.VerifyNoOtherCalls();
         }
 
         [Fact]
@@ -55,8 +50,6 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests
             Assert.Equal(expected, actual);
             _httpMessageHandler.VerifySend(HttpMethod.Post, _updateUri, Times.Once); ;
             _httpMessageHandler.VerifyNoOtherCalls();
-            _authProvider.Verify(x => x.GetAccessTokenAsync(), Times.Once);
-            _authProvider.VerifyNoOtherCalls();
         }
     }
 }

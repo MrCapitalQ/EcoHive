@@ -1,13 +1,14 @@
-﻿namespace MrCapitalQ.EcoHive.EcoBee.Auth
+﻿using System.Net.Http.Headers;
+
+namespace MrCapitalQ.EcoHive.EcoBee.Auth
 {
     public interface IEcoBeeAuthProvider
     {
-        Task<string> GetAccessTokenAsync();
+        Task<AuthenticationHeaderValue?> GetAuthHeaderAsync(CancellationToken cancellationToken);
     }
 
     public interface IEcoBeePinAuthProvider : IEcoBeeAuthProvider
     {
-        Task<bool> IsAuthenticated();
         Task<PinData> GetPinAsync(string scope);
         Task<bool> AuthenticateAsync(string authCode);
     }

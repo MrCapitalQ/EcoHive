@@ -2,7 +2,7 @@
 {
     public interface IEcoBeeAuthCache
     {
-        Task<EcoBeeAuthTokenData?> GetAysnc();
-        Task SetAysnc(EcoBeeAuthTokenData value);
+        Task<EcoBeeAuthTokenData?> GetAsync();
+        Task SetAsync(EcoBeeAuthTokenData value, TimeSpan expirationFromNow);
     }
 }

@@ -1,34 +1,28 @@
-﻿using MrCapitalQ.EcoHive.EcoBee.Auth;
-using MrCapitalQ.EcoHive.EcoBee.Dtos;
+﻿using MrCapitalQ.EcoHive.EcoBee.Dtos;
 using MrCapitalQ.EcoHive.EcoBee.Functions;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 
 namespace MrCapitalQ.EcoHive.EcoBee
 {
     public class EcoBeeThermostatClient : IEcoBeeThermostatClient
     {
-        private readonly HttpClient _httpClient;
-        private readonly IEcoBeeAuthProvider _authProvider;
+        private const string RequestUpdateUrl = "https://api.ecobee.com/1/thermostat?format=json";
 
-        public EcoBeeThermostatClient(HttpClient httpClient, IEcoBeeAuthProvider authProvider)
+        private readonly HttpClient _httpClient;
+
+        public EcoBeeThermostatClient(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _authProvider = authProvider;
         }
 
         public async Task<UpdateRequestResult> RequestUpdateAsync(params IThermostatFunction[] functions)
         {
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
-                await _authProvider.GetAccessTokenAsync().ConfigureAwait(false));
-
-            var postRequestUrl = "https://api.ecobee.com/1/thermostat?format=json";
             var request = new ThermostatUpdateRequest
             {
                 Functions = functions
             };
 
-            var responseMessage = await _httpClient.PostAsJsonAsync(postRequestUrl, request).ConfigureAwait(false);
+            var responseMessage = await _httpClient.PostAsJsonAsync(RequestUpdateUrl, request).ConfigureAwait(false);
             responseMessage.EnsureSuccessStatusCode();
 
             var status = await responseMessage.Content.ReadFromJsonAsync<StatusResponse>().ConfigureAwait(false);

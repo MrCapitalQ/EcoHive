@@ -39,11 +39,17 @@ namespace MrCapitalQ.EcoHive.Api.Controllers
                         .HoldIndefinitely()
                         .Build());
                     break;
+                default:
+                    _logger.LogInformation("Unknown occupancy status {OccupancyStatus}.", occupancyStatus);
+                    break;
             }
 
-            _logger.LogInformation("Thermostat function update request completed {completionStatus}.{message}",
-                result?.IsSuccessful == false ? "unsuccessfully" : "successfully",
-                !string.IsNullOrWhiteSpace(result?.Message) ? result.Message : string.Empty);
+            if (result?.IsSuccessful == true)
+                _logger.LogInformation("Thermostat function update request completed successfully.");
+
+            if (result?.IsSuccessful == false)
+                _logger.LogInformation("Thermostat function update request failed. {Message}",
+                    result.Message);
 
             return NoContent();
         }
