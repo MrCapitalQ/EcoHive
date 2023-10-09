@@ -1,4 +1,5 @@
-﻿using Moq;
+﻿using Microsoft.AspNetCore.Http;
+using Moq;
 using MrCapitalQ.EcoHive.Api.Controllers;
 using MrCapitalQ.EcoHive.Api.Models;
 using MrCapitalQ.EcoHive.EcoBee.Auth;
@@ -33,7 +34,7 @@ namespace MrCapitalQ.EcoHive.Api.Tests.Controllers
 
             var result = await _controller.GetPinAsync();
 
-            var actual = ControllerAssert.IsOkObjectResult<PinData>(result);
+            var actual = ControllerAssert.IsObjectResult<PinData>(result, StatusCodes.Status200OK);
             Assert.Equal(pinData, actual);
             _ecoBeePinAuthProvider.Verify(x => x.GetPinAsync(scope), Times.Once);
             _ecoBeePinAuthProvider.VerifyNoOtherCalls();
@@ -49,7 +50,7 @@ namespace MrCapitalQ.EcoHive.Api.Tests.Controllers
 
             var result = await _controller.AuthenticateAsync(request);
 
-            var actual = ControllerAssert.IsOkObjectResult<AuthenticateResult>(result);
+            var actual = ControllerAssert.IsObjectResult<AuthenticateResult>(result, StatusCodes.Status200OK);
             Assert.Equal(expected, actual);
             _ecoBeePinAuthProvider.Verify(x => x.AuthenticateAsync(authCode), Times.Once);
             _ecoBeePinAuthProvider.VerifyNoOtherCalls();

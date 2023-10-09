@@ -16,21 +16,21 @@ namespace MrCapitalQ.EcoHive.Api.Controllers
         }
 
         [HttpGet("Pins", Name = nameof(GetPinAsync))]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PinData))]
+        [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesDefaultResponseType]
-        public async Task<IActionResult> GetPinAsync()
+        public async Task<ActionResult<PinData>> GetPinAsync()
         {
             var pinData = await _ecoBeePinAuthProvider.GetPinAsync("smartWrite");
-            return Ok(pinData);
+            return pinData;
         }
 
         [HttpPost(Name = nameof(AuthenticateAsync))]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AuthenticateResult))]
+        [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesDefaultResponseType]
-        public async Task<IActionResult> AuthenticateAsync(AuthenticateRequest request)
+        public async Task<ActionResult<AuthenticateResult>> AuthenticateAsync(AuthenticateRequest request)
         {
             var result = await _ecoBeePinAuthProvider.AuthenticateAsync(request.AuthCode);
-            return Ok(new AuthenticateResult { IsAuthenticated = result });
+            return new AuthenticateResult { IsAuthenticated = result };
         }
     }
 }
