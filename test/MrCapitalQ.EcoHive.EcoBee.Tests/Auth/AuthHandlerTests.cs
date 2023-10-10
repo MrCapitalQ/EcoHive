@@ -1,19 +1,18 @@
-﻿using Moq;
-using MrCapitalQ.EcoHive.EcoBee.Auth;
+﻿using MrCapitalQ.EcoHive.EcoBee.Auth;
 using System.Net.Http.Headers;
 
 namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
 {
     public class AuthHandlerTests
     {
-        private readonly Mock<IEcoBeeAuthProvider> _authProvider;
+        private readonly IEcoBeeAuthProvider _authProvider;
 
         private readonly TestAuthHandler _handler;
 
         public AuthHandlerTests()
         {
-            _authProvider = new();
-            _handler = new(_authProvider.Object);
+            _authProvider = Substitute.For<IEcoBeeAuthProvider>();
+            _handler = new(_authProvider);
         }
 
         [Fact]
@@ -21,7 +20,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
         {
             var request = new HttpRequestMessage();
             var expected = new AuthenticationHeaderValue("bearer", "token");
-            _authProvider.Setup(p => p.GetAuthHeaderAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expected);
+            _authProvider.GetAuthHeaderAsync(Arg.Any<CancellationToken>()).Returns(expected);
 
             await _handler.SendAsync(request, CancellationToken.None);
 
@@ -43,7 +42,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
         {
             var request = new HttpRequestMessage();
             var expected = new AuthenticationHeaderValue("bearer", "token");
-            _authProvider.Setup(p => p.GetAuthHeaderAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expected);
+            _authProvider.GetAuthHeaderAsync(Arg.Any<CancellationToken>()).Returns(expected);
 
             _handler.Send(request, CancellationToken.None);
 
@@ -64,7 +63,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
         {
             public TestAuthHandler(IEcoBeeAuthProvider authProvider) : base(authProvider)
             {
-                InnerHandler = new Mock<DelegatingHandler>().Object;
+                InnerHandler = Substitute.For<DelegatingHandler>();
             }
 
             public new Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

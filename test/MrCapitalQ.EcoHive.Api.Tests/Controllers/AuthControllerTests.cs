@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Moq;
 using MrCapitalQ.EcoHive.Api.Controllers;
 using MrCapitalQ.EcoHive.Api.Models;
 using MrCapitalQ.EcoHive.EcoBee.Auth;
@@ -8,15 +7,15 @@ namespace MrCapitalQ.EcoHive.Api.Tests.Controllers
 {
     public class AuthControllerTests
     {
-        private readonly Mock<IEcoBeePinAuthProvider> _ecoBeePinAuthProvider;
+        private readonly IEcoBeePinAuthProvider _ecoBeePinAuthProvider;
 
         private readonly AuthController _controller;
 
         public AuthControllerTests()
         {
-            _ecoBeePinAuthProvider = new();
+            _ecoBeePinAuthProvider = Substitute.For<IEcoBeePinAuthProvider>();
 
-            _controller = new AuthController(_ecoBeePinAuthProvider.Object);
+            _controller = new AuthController(_ecoBeePinAuthProvider);
         }
 
         [Fact]
@@ -30,14 +29,13 @@ namespace MrCapitalQ.EcoHive.Api.Tests.Controllers
                 Scope = scope,
                 Expiration = DateTimeOffset.UtcNow
             };
-            _ecoBeePinAuthProvider.Setup(x => x.GetPinAsync(scope)).ReturnsAsync(pinData);
+            _ecoBeePinAuthProvider.GetPinAsync(scope).Returns(pinData);
 
             var result = await _controller.GetPinAsync();
 
             var actual = ControllerAssert.IsObjectResult<PinData>(result, StatusCodes.Status200OK);
             Assert.Equal(pinData, actual);
-            _ecoBeePinAuthProvider.Verify(x => x.GetPinAsync(scope), Times.Once);
-            _ecoBeePinAuthProvider.VerifyNoOtherCalls();
+            await _ecoBeePinAuthProvider.Received(1).GetPinAsync(scope);
         }
 
         [Fact]
@@ -45,15 +43,14 @@ namespace MrCapitalQ.EcoHive.Api.Tests.Controllers
         {
             var authCode = "fake_authcode";
             var request = new AuthenticateRequest { AuthCode = authCode };
-            _ecoBeePinAuthProvider.Setup(x => x.AuthenticateAsync(authCode)).ReturnsAsync(true);
+            _ecoBeePinAuthProvider.AuthenticateAsync(authCode).Returns(true);
             var expected = new AuthenticateResult { IsAuthenticated = true };
 
             var result = await _controller.AuthenticateAsync(request);
 
             var actual = ControllerAssert.IsObjectResult<AuthenticateResult>(result, StatusCodes.Status200OK);
             Assert.Equal(expected, actual);
-            _ecoBeePinAuthProvider.Verify(x => x.AuthenticateAsync(authCode), Times.Once);
-            _ecoBeePinAuthProvider.VerifyNoOtherCalls();
+            await _ecoBeePinAuthProvider.Received(1).AuthenticateAsync(authCode);
         }
     }
 }

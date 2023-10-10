@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
-using Moq;
 using MrCapitalQ.EcoHive.EcoBee.Auth;
 
 namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore.Tests
@@ -8,15 +7,15 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore.Tests
     public class EcoBeeAuthCacheTests
     {
         private const string AuthTokenCacheKey = "EcoBeeAuthToken";
-        private readonly Mock<IMemoryCache> _memoryCache;
+        private readonly IMemoryCache _memoryCache;
 
         private readonly EcoBeeAuthCache _authCache;
 
         public EcoBeeAuthCacheTests()
         {
-            _memoryCache = new();
+            _memoryCache = Substitute.For<IMemoryCache>();
 
-            _authCache = new(_memoryCache.Object);
+            _authCache = new(_memoryCache);
         }
 
         [Fact]
@@ -35,8 +34,12 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore.Tests
                 AccessToken = "fake_access_token",
                 TokenType = "bearer"
             };
-            object? cachedData = data;
-            _memoryCache.Setup(c => c.TryGetValue(AuthTokenCacheKey, out cachedData)).Returns(true);
+            _memoryCache.TryGetValue(AuthTokenCacheKey, out var cachedData)
+                .Returns(x =>
+                {
+                    x[1] = data;
+                    return true;
+                });
 
             var actual = await _authCache.GetAsync();
 
@@ -53,13 +56,13 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore.Tests
             };
             var expiration = TimeSpan.FromSeconds(10);
             TestCacheEntry cacheEntry = new(AuthTokenCacheKey);
-            _memoryCache.Setup(c => c.CreateEntry(It.IsAny<object>())).Returns(cacheEntry);
+            _memoryCache.CreateEntry(Arg.Any<object>()).Returns(cacheEntry);
 
             await _authCache.SetAsync(value, expiration);
 
             Assert.Equal(value, cacheEntry.Value);
             Assert.Equal(expiration, cacheEntry.AbsoluteExpirationRelativeToNow);
-            _memoryCache.Verify(c => c.CreateEntry(AuthTokenCacheKey));
+            _memoryCache.Received(1).CreateEntry(AuthTokenCacheKey);
         }
 
         private class TestCacheEntry : ICacheEntry

@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using Moq;
 using MrCapitalQ.EcoHive.EcoBee.Auth;
 using MrCapitalQ.EcoHive.EcoBee.Exceptions;
 using System.Net;
@@ -13,32 +12,32 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
         private const string ApiKey = "fake_api_key";
         private const string Scope = "fake_scope";
 
-        private readonly Mock<HttpMessageHandler> _httpMessageHandler;
+        private readonly SubstituteHandler _httpMessageHandler;
         private readonly HttpClient _httpClient;
         private readonly DateTimeOffset _now = DateTimeOffset.UtcNow;
-        private readonly Mock<IDateTimeProvider> _dateTimeProvider;
-        private readonly Mock<IEcoBeeAuthCache> _authCache;
-        private readonly Mock<IEcoBeeRefreshTokenStore> _refreshTokenStore;
-        private readonly Mock<ILogger<EcoBeePinAuthProvider>> _logger;
+        private readonly IDateTimeProvider _dateTimeProvider;
+        private readonly IEcoBeeAuthCache _authCache;
+        private readonly IEcoBeeRefreshTokenStore _refreshTokenStore;
+        private readonly ILogger<EcoBeePinAuthProvider> _logger;
 
         private readonly EcoBeePinAuthProvider _ecoBeePinAuthProvider;
 
         public EcoBeePinAuthProviderTests()
         {
-            _httpMessageHandler = new();
-            _httpClient = new(_httpMessageHandler.Object);
-            _dateTimeProvider = new();
-            _dateTimeProvider.Setup(x => x.UtcNow()).Returns(_now);
-            _authCache = new();
-            _refreshTokenStore = new();
-            _logger = new();
+            _httpMessageHandler = HttpSubstitute.ForHandler();
+            _httpClient = new(_httpMessageHandler);
+            _dateTimeProvider = Substitute.For<IDateTimeProvider>();
+            _dateTimeProvider.UtcNow().Returns(_now);
+            _authCache = Substitute.For<IEcoBeeAuthCache>();
+            _refreshTokenStore = Substitute.For<IEcoBeeRefreshTokenStore>();
+            _logger = Substitute.For<ILogger<EcoBeePinAuthProvider>>();
 
             _ecoBeePinAuthProvider = new EcoBeePinAuthProvider(_httpClient,
-                _dateTimeProvider.Object,
-                _authCache.Object,
-                _refreshTokenStore.Object,
+                _dateTimeProvider,
+                _authCache,
+                _refreshTokenStore,
                 ApiKey,
-                _logger.Object);
+                _logger);
         }
 
         [Fact]
@@ -52,7 +51,12 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
                 scope = "fake_scope",
                 expires_in = 9
             };
-            _httpMessageHandler.SetupSend(HttpMethod.Get, requestUri).ReturnsResponse(HttpStatusCode.OK, JsonSerializer.Serialize(responseBody));
+            _httpMessageHandler.SendSubstitute(HttpArg.IsRequest(HttpMethod.Get, requestUri), Arg.Any<CancellationToken>())
+                .Returns(new HttpResponseMessage()
+                {
+                    StatusCode = HttpStatusCode.OK,
+                    Content = new StringContent(JsonSerializer.Serialize(responseBody))
+                });
             var expected = new PinData
             {
                 Pin = responseBody.ecobeePin,
@@ -64,19 +68,26 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             var actual = await _ecoBeePinAuthProvider.GetPinAsync(Scope);
 
             Assert.Equal(expected, actual);
-            _httpMessageHandler.VerifySend(HttpMethod.Get, requestUri, Times.Once);
+            _httpMessageHandler.Received(1)
+                .SendSubstitute(HttpArg.IsRequest(HttpMethod.Get, requestUri), Arg.Any<CancellationToken>());
         }
 
         [Fact]
         public async Task GetPinAsync_RootLiteralNullJsonResponse_ThrowsException()
         {
             var requestUri = new Uri($"https://api.ecobee.com/authorize?response_type=ecobeePin&client_id={ApiKey}&scope={Scope}");
-            _httpMessageHandler.SetupSend(HttpMethod.Get, requestUri).ReturnsResponse(HttpStatusCode.OK, "null");
+            _httpMessageHandler.SendSubstitute(HttpArg.IsRequest(HttpMethod.Get, requestUri), Arg.Any<CancellationToken>())
+                .Returns(new HttpResponseMessage()
+                {
+                    StatusCode = HttpStatusCode.OK,
+                    Content = new StringContent("null")
+                });
 
             var ex = await Assert.ThrowsAsync<EcoBeeClientAuthException>(() => _ecoBeePinAuthProvider.GetPinAsync(Scope));
 
             Assert.Equal("Unexpected root literal null response when requesting a pin.", ex.Message);
-            _httpMessageHandler.VerifySend(HttpMethod.Get, requestUri, Times.Once);
+            _httpMessageHandler.Received(1)
+                .SendSubstitute(HttpArg.IsRequest(HttpMethod.Get, requestUri), Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -89,14 +100,20 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
                 access_token = "fake_access_token",
                 refresh_token = "fake_refresh_token"
             };
-            _httpMessageHandler.SetupSend(HttpMethod.Post, requestUri).ReturnsResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponseBody));
+            _httpMessageHandler.SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>())
+                .Returns(new HttpResponseMessage()
+                {
+                    StatusCode = HttpStatusCode.OK,
+                    Content = new StringContent(JsonSerializer.Serialize(tokenResponseBody))
+                });
 
             var result = await _ecoBeePinAuthProvider.AuthenticateAsync(authCode);
 
             Assert.True(result);
-            _httpMessageHandler.VerifySend(HttpMethod.Post, requestUri, Times.Once);
-            _authCache.Verify(c => c.SetAsync(It.IsAny<EcoBeeAuthTokenData>(), It.IsAny<TimeSpan>()), Times.Once);
-            _refreshTokenStore.Verify(s => s.SetAsync(tokenResponseBody.refresh_token), Times.Once);
+            _httpMessageHandler.Received(1)
+                .SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>());
+            await _authCache.Received(1).SetAsync(Arg.Any<EcoBeeAuthTokenData>(), Arg.Any<TimeSpan>());
+            await _refreshTokenStore.Received(1).SetAsync(tokenResponseBody.refresh_token);
         }
 
         [Fact]
@@ -105,12 +122,18 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             var authCode = "fake_code";
             var requestUri = new Uri($"https://api.ecobee.com/token?grant_type=ecobeePin&code={authCode}&client_id={ApiKey}&ecobee_type=jwt");
             var tokenResponseBody = new { };
-            _httpMessageHandler.SetupSend(HttpMethod.Post, requestUri).ReturnsResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponseBody));
+            _httpMessageHandler.SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>())
+                .Returns(new HttpResponseMessage()
+                {
+                    StatusCode = HttpStatusCode.OK,
+                    Content = new StringContent(JsonSerializer.Serialize(tokenResponseBody))
+                });
 
             var result = await _ecoBeePinAuthProvider.AuthenticateAsync(authCode);
 
             Assert.False(result);
-            _httpMessageHandler.VerifySend(HttpMethod.Post, requestUri, Times.Once);
+            _httpMessageHandler.Received(1)
+                .SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -118,19 +141,25 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
         {
             var authCode = "fake_code";
             var requestUri = new Uri($"https://api.ecobee.com/token?grant_type=ecobeePin&code={authCode}&client_id={ApiKey}&ecobee_type=jwt");
-            _httpMessageHandler.SetupSend(HttpMethod.Post, requestUri).ReturnsResponse(HttpStatusCode.OK, "null");
+            _httpMessageHandler.SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>())
+                .Returns(new HttpResponseMessage()
+                {
+                    StatusCode = HttpStatusCode.OK,
+                    Content = new StringContent("null")
+                });
 
             var ex = await Assert.ThrowsAsync<EcoBeeClientAuthException>(() => _ecoBeePinAuthProvider.AuthenticateAsync(authCode));
 
             Assert.Equal("Unexpected root literal null response when requesting an access token.", ex.Message);
-            _httpMessageHandler.VerifySend(HttpMethod.Post, requestUri, Times.Once);
+            _httpMessageHandler.Received(1)
+                .SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>());
         }
 
         [Fact]
         public async Task GetAuthHeaderAsync_TokenExpired_RefreshesAccessToken()
         {
             var refreshToken = "fake_refresh_token";
-            _refreshTokenStore.Setup(x => x.GetAsync()).ReturnsAsync(refreshToken);
+            _refreshTokenStore.GetAsync().Returns(refreshToken);
             var tokenResponseBody = new
             {
                 token_type = "bearer",
@@ -139,12 +168,18 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
                 expires_in = 9
             };
             var requestUri = new Uri($"https://api.ecobee.com/token?grant_type=refresh_token&refresh_token={refreshToken}&client_id={ApiKey}&ecobee_type=jwt");
-            _httpMessageHandler.SetupSend(HttpMethod.Post, requestUri).ReturnsResponse(HttpStatusCode.OK, JsonSerializer.Serialize(tokenResponseBody));
+            _httpMessageHandler.SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>())
+                .Returns(new HttpResponseMessage()
+                {
+                    StatusCode = HttpStatusCode.OK,
+                    Content = new StringContent(JsonSerializer.Serialize(tokenResponseBody))
+                });
 
             var result = await _ecoBeePinAuthProvider.GetAuthHeaderAsync(CancellationToken.None);
 
             Assert.Equal(new AuthenticationHeaderValue(tokenResponseBody.token_type, tokenResponseBody.access_token), result);
-            _httpMessageHandler.VerifySend(HttpMethod.Post, requestUri, Times.Once);
+            _httpMessageHandler.Received(1)
+                .SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -155,17 +190,15 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
                 TokenType = "bearer",
                 AccessToken = "fake_access_token"
             };
-            var isAfterSemaphore = false;
-            _authCache.Setup(x => x.GetAsync())
-                .ReturnsAsync(() => isAfterSemaphore ? authData : null)
-                .Callback(() => isAfterSemaphore = true);
+            _authCache.GetAsync().Returns(null, authData);
             var refreshToken = "fake_refresh_token";
-            _refreshTokenStore.Setup(x => x.GetAsync()).ReturnsAsync(refreshToken);
+            _refreshTokenStore.GetAsync().Returns(refreshToken);
 
             var result = await _ecoBeePinAuthProvider.GetAuthHeaderAsync(CancellationToken.None);
 
             Assert.Equal(new AuthenticationHeaderValue(authData.TokenType, authData.AccessToken), result);
-            _httpMessageHandler.VerifySend(HttpMethod.Post, It.IsAny<Uri>(), Times.Never);
+            _httpMessageHandler.DidNotReceiveWithAnyArgs()
+                .SendSubstitute(Arg.Any<HttpRequestMessage>(), Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -176,46 +209,47 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
                 TokenType = "bearer",
                 AccessToken = "fake_access_token"
             };
-            _authCache.Setup(x => x.GetAsync()).ReturnsAsync(authData);
+            _authCache.GetAsync().Returns(authData);
             var refreshToken = "fake_refresh_token";
-            _refreshTokenStore.Setup(x => x.GetAsync()).ReturnsAsync(refreshToken);
-            var tokenResponseBody = new
-            {
-                token_type = "bearer",
-                access_token = "fake_access_token",
-                refresh_Token = refreshToken,
-                expires_in = 9
-            };
+            _refreshTokenStore.GetAsync().Returns(refreshToken);
 
             var result = await _ecoBeePinAuthProvider.GetAuthHeaderAsync(CancellationToken.None);
 
             Assert.Equal(new AuthenticationHeaderValue(authData.TokenType, authData.AccessToken), result);
-            _httpMessageHandler.VerifySend(HttpMethod.Post, It.IsAny<Uri>(), Times.Never);
+            _httpMessageHandler.DidNotReceiveWithAnyArgs()
+                .SendSubstitute(Arg.Any<HttpRequestMessage>(), Arg.Any<CancellationToken>());
         }
 
         [Fact]
-        public async Task GetAuthHeaderAsync_NoAuthData_ReturnsEmptyString()
+        public async Task GetAuthHeaderAsync_NoAuthData_ReturnsNull()
         {
+            _refreshTokenStore.GetAsync().Returns((string?)null);
+
             var result = await _ecoBeePinAuthProvider.GetAuthHeaderAsync(CancellationToken.None);
 
             Assert.Null(result);
-            _httpMessageHandler.VerifySend(HttpMethod.Post, It.IsAny<Uri>(), Times.Never);
+            _httpMessageHandler.DidNotReceiveWithAnyArgs()
+                .SendSubstitute(Arg.Any<HttpRequestMessage>(), Arg.Any<CancellationToken>());
         }
 
         [Fact]
         public async Task GetAuthHeaderAsync_RootLiteralNullJsonResponseWhenRefreshingToken_ThrowsException()
         {
             var refreshToken = "fake_refresh_token";
-            _refreshTokenStore.Setup(x => x.GetAsync()).ReturnsAsync(refreshToken);
+            _refreshTokenStore.GetAsync().Returns(refreshToken);
             var requestUri = new Uri($"https://api.ecobee.com/token?grant_type=refresh_token&refresh_token={refreshToken}&client_id={ApiKey}&ecobee_type=jwt");
-            _httpMessageHandler.SetupSend(HttpMethod.Post, requestUri).ReturnsResponse(HttpStatusCode.OK, "null");
+            _httpMessageHandler.SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>())
+                .Returns(new HttpResponseMessage()
+                {
+                    StatusCode = HttpStatusCode.OK,
+                    Content = new StringContent("null")
+                });
 
             var ex = await Assert.ThrowsAsync<EcoBeeClientAuthException>(() => _ecoBeePinAuthProvider.GetAuthHeaderAsync(CancellationToken.None));
 
             Assert.Equal("Unexpected root literal null response when refreshing the access token.", ex.Message);
-            _httpMessageHandler.VerifySend(HttpMethod.Post,
-                requestUri,
-                Times.Once);
+            _httpMessageHandler.Received(1)
+                .SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>());
         }
     }
 }
