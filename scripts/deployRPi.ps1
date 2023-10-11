@@ -4,7 +4,7 @@ $currentDir = Get-Location
 
 try {
     Set-Location $PSScriptRoot
-    Set-Location ..\..
+    Set-Location ..
 
     # Clean publish directory
     Remove-Item -LiteralPath $publishDirectory -Force -Recurse -ErrorAction Ignore
