@@ -1,4 +1,6 @@
-﻿namespace MrCapitalQ.EcoHive.EcoBee.Auth
+﻿using System.Net;
+
+namespace MrCapitalQ.EcoHive.EcoBee.Auth
 {
     public class AuthHandler : DelegatingHandler
     {
@@ -15,7 +17,11 @@
             if (authHeader is not null)
                 request.Headers.Authorization = authHeader;
 
-            return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+                _authProvider.ClearCached();
+
+            return response;
         }
 
         protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -24,7 +30,11 @@
             if (authHeader is not null)
                 request.Headers.Authorization = authHeader;
 
-            return base.Send(request, cancellationToken);
+            var response = base.Send(request, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+                _authProvider.ClearCached();
+
+            return response;
         }
     }
 }

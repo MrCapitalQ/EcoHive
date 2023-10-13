@@ -1,4 +1,5 @@
 ﻿using MrCapitalQ.EcoHive.EcoBee.Auth;
+using System.Net;
 using System.Net.Http.Headers;
 
 namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
@@ -6,13 +7,18 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
     public class AuthHandlerTests
     {
         private readonly IEcoBeeAuthProvider _authProvider;
+        private readonly SubstituteHandler _innerHandler;
 
         private readonly TestAuthHandler _handler;
 
         public AuthHandlerTests()
         {
             _authProvider = Substitute.For<IEcoBeeAuthProvider>();
-            _handler = new(_authProvider);
+            _innerHandler = HttpSubstitute.ForHandler();
+            _innerHandler.SendSubstitute(Arg.Any<HttpRequestMessage>(), Arg.Any<CancellationToken>())
+                .Returns(new HttpResponseMessage { StatusCode = HttpStatusCode.OK });
+
+            _handler = new(_authProvider, _innerHandler);
         }
 
         [Fact]
@@ -25,6 +31,8 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             await _handler.SendAsync(request, CancellationToken.None);
 
             Assert.Equal(expected, request.Headers.Authorization);
+            await _authProvider.Received(1).GetAuthHeaderAsync(Arg.Any<CancellationToken>());
+            _authProvider.DidNotReceiveWithAnyArgs().ClearCached();
         }
 
         [Fact]
@@ -35,10 +43,24 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             await _handler.SendAsync(request, CancellationToken.None);
 
             Assert.Null(request.Headers.Authorization);
+            await _authProvider.Received(1).GetAuthHeaderAsync(Arg.Any<CancellationToken>());
+            _authProvider.DidNotReceiveWithAnyArgs().ClearCached();
         }
 
         [Fact]
-        public void Send_NonNullAuthHeader_SetsAuthHeader()
+        public async Task SendAsync_UnauthorizedResponse_ClearsAuthProviderCache()
+        {
+            _innerHandler.SendSubstitute(Arg.Any<HttpRequestMessage>(), Arg.Any<CancellationToken>())
+                .Returns(new HttpResponseMessage { StatusCode = HttpStatusCode.Unauthorized });
+
+            await _handler.SendAsync(new HttpRequestMessage(), CancellationToken.None);
+
+            await _authProvider.Received(1).GetAuthHeaderAsync(Arg.Any<CancellationToken>());
+            _authProvider.Received(1).ClearCached();
+        }
+
+        [Fact]
+        public async Task Send_NonNullAuthHeader_SetsAuthHeader()
         {
             var request = new HttpRequestMessage();
             var expected = new AuthenticationHeaderValue("bearer", "token");
@@ -47,23 +69,39 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             _handler.Send(request, CancellationToken.None);
 
             Assert.Equal(expected, request.Headers.Authorization);
+            await _authProvider.Received(1).GetAuthHeaderAsync(Arg.Any<CancellationToken>());
+            _authProvider.DidNotReceiveWithAnyArgs().ClearCached();
         }
 
         [Fact]
-        public void Send_NullAuthHeader_DoesNothing()
+        public async Task Send_NullAuthHeader_DoesNothing()
         {
             var request = new HttpRequestMessage();
 
             _handler.Send(request, CancellationToken.None);
 
             Assert.Null(request.Headers.Authorization);
+            await _authProvider.Received(1).GetAuthHeaderAsync(Arg.Any<CancellationToken>());
+            _authProvider.DidNotReceiveWithAnyArgs().ClearCached();
+        }
+
+        [Fact]
+        public async Task Send_UnauthorizedResponse_ClearsAuthProviderCache()
+        {
+            _innerHandler.SendSubstitute(Arg.Any<HttpRequestMessage>(), Arg.Any<CancellationToken>())
+                .Returns(new HttpResponseMessage { StatusCode = HttpStatusCode.Unauthorized });
+
+            _handler.Send(new HttpRequestMessage(), CancellationToken.None);
+
+            await _authProvider.Received(1).GetAuthHeaderAsync(Arg.Any<CancellationToken>());
+            _authProvider.Received(1).ClearCached();
         }
 
         private class TestAuthHandler : AuthHandler
         {
-            public TestAuthHandler(IEcoBeeAuthProvider authProvider) : base(authProvider)
+            public TestAuthHandler(IEcoBeeAuthProvider authProvider, HttpMessageHandler innerHandler) : base(authProvider)
             {
-                InnerHandler = Substitute.For<DelegatingHandler>();
+                InnerHandler = innerHandler;
             }
 
             public new Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

@@ -5,6 +5,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
     public interface IEcoBeeAuthProvider
     {
         Task<AuthenticationHeaderValue?> GetAuthHeaderAsync(CancellationToken cancellationToken);
+        void ClearCached();
     }
 
     public interface IEcoBeePinAuthProvider : IEcoBeeAuthProvider

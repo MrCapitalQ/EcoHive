@@ -24,5 +24,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore
             _memoryCache.Set(AuthTokenCacheKey, value, expirationFromNow);
             return Task.CompletedTask;
         }
+
+        public void Invalidate() => _memoryCache.Remove(AuthTokenCacheKey);
     }
 }

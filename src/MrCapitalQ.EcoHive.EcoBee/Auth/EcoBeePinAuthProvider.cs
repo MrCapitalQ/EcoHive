@@ -72,6 +72,8 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
             return null;
         }
 
+        public void ClearCached() => _authCache.Invalidate();
+
         private async Task<EcoBeeAuthTokenData> RequestAccessTokenAsync(string authCode)
         {
             var url = $"https://api.ecobee.com/token?grant_type=ecobeePin&code={authCode}&client_id={_apiKey}&ecobee_type=jwt";

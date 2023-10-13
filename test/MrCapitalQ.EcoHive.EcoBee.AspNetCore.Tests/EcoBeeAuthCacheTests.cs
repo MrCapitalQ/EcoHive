@@ -65,6 +65,14 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore.Tests
             _memoryCache.Received(1).CreateEntry(AuthTokenCacheKey);
         }
 
+        [Fact]
+        public void Invalidate_RemovesCacheEntry()
+        {
+            _authCache.Invalidate();
+
+            _memoryCache.Received(1).Remove(AuthTokenCacheKey);
+        }
+
         private class TestCacheEntry : ICacheEntry
         {
             public TestCacheEntry(string key)

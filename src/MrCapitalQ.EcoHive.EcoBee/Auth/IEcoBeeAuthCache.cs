@@ -4,5 +4,6 @@
     {
         Task<EcoBeeAuthTokenData?> GetAsync();
         Task SetAsync(EcoBeeAuthTokenData value, TimeSpan expirationFromNow);
+        void Invalidate();
     }
 }

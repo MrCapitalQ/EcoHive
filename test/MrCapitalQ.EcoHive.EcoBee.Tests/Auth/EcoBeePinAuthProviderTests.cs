@@ -251,5 +251,13 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             _httpMessageHandler.Received(1)
                 .SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>());
         }
+
+        [Fact]
+        public void ClearCached_InvalidatesCache()
+        {
+            _ecoBeePinAuthProvider.ClearCached();
+
+            _authCache.Received(1).Invalidate();
+        }
     }
 }
