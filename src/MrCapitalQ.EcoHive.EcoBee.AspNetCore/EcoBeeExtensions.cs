@@ -12,7 +12,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore
     {
         private const string ConfigurationSectionName = "EcoBee";
 
-        public static IServiceCollection AddEcoBee(this IServiceCollection services)
+        public static IEcoBeeBuilder AddEcoBee(this IServiceCollection services)
         {
             services.AddMemoryCache();
 
@@ -26,8 +26,8 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore
                 .BindConfiguration(ConfigurationSectionName)
                 .ValidateDataAnnotations();
 
-            services.AddHttpClient<IEcoBeePinAuthProvider, DefaultEcoBeePinAuthProvider>();
-            services.AddHttpClient<IEcoBeeThermostatClient, EcoBeeThermostatClient>()
+            var authClientBuilder = services.AddHttpClient<IEcoBeePinAuthProvider, DefaultEcoBeePinAuthProvider>();
+            var ecoBeeClientBuilder = services.AddHttpClient<IEcoBeeThermostatClient, EcoBeeThermostatClient>()
                 .AddHttpMessageHandler<AuthHandler>();
 
             services.TryAddTransient<IDateTimeProvider, DateTimeProvider>();
@@ -36,7 +36,49 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore
             services.TryAddTransient<IEcoBeeAuthProvider>(s => s.GetRequiredService<IEcoBeePinAuthProvider>());
             services.TryAddTransient<AuthHandler>();
 
-            return services;
+            return new EcoBeeBuilder
+            {
+                AuthClientBuilder = authClientBuilder,
+                EcoBeeClientBuilder = ecoBeeClientBuilder,
+                Services = services
+            };
         }
+
+        public static IEcoBeeBuilder ConfigureHttpClients(this IEcoBeeBuilder builder, Action<IHttpClientBuilder> configure)
+            => builder.ConfigureAuthHttpClient(configure).ConfigureEcoBeeHttpClient(configure);
+
+        public static IEcoBeeBuilder ConfigureAuthHttpClient(this IEcoBeeBuilder builder, Action<IHttpClientBuilder> configure)
+        {
+            configure(builder.AuthClientBuilder);
+            return builder;
+        }
+
+        public static IEcoBeeBuilder ConfigureEcoBeeHttpClient(this IEcoBeeBuilder builder, Action<IHttpClientBuilder> configure)
+        {
+            configure(builder.AuthClientBuilder);
+            return builder;
+        }
+    }
+
+
+    public interface IEcoBeeBuilder
+    {
+        IHttpClientBuilder AuthClientBuilder { get; }
+
+        IHttpClientBuilder EcoBeeClientBuilder { get; }
+
+        /// <summary>
+        /// Gets the application service collection.
+        /// </summary>
+        IServiceCollection Services { get; }
+    }
+
+    internal class EcoBeeBuilder : IEcoBeeBuilder
+    {
+        public required IHttpClientBuilder AuthClientBuilder { get; init; }
+
+        public required IHttpClientBuilder EcoBeeClientBuilder { get; init; }
+
+        public required IServiceCollection Services { get; init; }
     }
 }

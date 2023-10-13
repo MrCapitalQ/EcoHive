@@ -1,4 +1,6 @@
 using MrCapitalQ.EcoHive.EcoBee.AspNetCore;
+using Polly;
+using Polly.Extensions.Http;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,7 +17,14 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddEcoBee();
+
+var retryPolicy = HttpPolicyExtensions
+    .HandleTransientHttpError()
+    .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.NotFound)
+    .WaitAndRetryAsync(6, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+
+builder.Services.AddEcoBee()
+    .ConfigureHttpClients(b => b.SetHandlerLifetime(TimeSpan.FromMinutes(5)).AddPolicyHandler(retryPolicy));
 
 var app = builder.Build();
 
