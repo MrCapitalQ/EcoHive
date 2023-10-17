@@ -24,7 +24,7 @@ namespace MrCapitalQ.EcoHive.Api.Controllers
         [ProducesDefaultResponseType]
         public async Task<IActionResult> UpdateHomeStatusAsync([Required] OccupancyStatus occupancyStatus)
         {
-            _logger.LogInformation("Setting home occupancy status to {status}.", occupancyStatus);
+            _logger.LogInformation("Setting home occupancy status to {Status}.", occupancyStatus);
 
             UpdateRequestResult? result = null;
             switch (occupancyStatus)
