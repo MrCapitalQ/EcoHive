@@ -121,13 +121,8 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
         {
             var authCode = "fake_code";
             var requestUri = new Uri($"https://api.ecobee.com/token?grant_type=ecobeePin&code={authCode}&client_id={ApiKey}&ecobee_type=jwt");
-            var tokenResponseBody = new { };
             _httpMessageHandler.SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>())
-                .Returns(new HttpResponseMessage()
-                {
-                    StatusCode = HttpStatusCode.OK,
-                    Content = new StringContent(JsonSerializer.Serialize(tokenResponseBody))
-                });
+                .Returns(new HttpResponseMessage() { StatusCode = HttpStatusCode.BadRequest });
 
             var result = await _ecoBeePinAuthProvider.AuthenticateAsync(authCode);
 
@@ -221,7 +216,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
         }
 
         [Fact]
-        public async Task GetAuthHeaderAsync_NoAuthData_ReturnsNull()
+        public async Task GetAuthHeaderAsync_NoRefreshToken_ReturnsNull()
         {
             _refreshTokenStore.GetAsync().Returns((string?)null);
 
@@ -230,6 +225,22 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             Assert.Null(result);
             _httpMessageHandler.DidNotReceiveWithAnyArgs()
                 .SendSubstitute(Arg.Any<HttpRequestMessage>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task GetAuthHeaderAsync_NonSuccessfulResponseWhenRefreshingToken_ReturnsNull()
+        {
+            var refreshToken = "fake_refresh_token";
+            _refreshTokenStore.GetAsync().Returns(refreshToken);
+            var requestUri = new Uri($"https://api.ecobee.com/token?grant_type=refresh_token&refresh_token={refreshToken}&client_id={ApiKey}&ecobee_type=jwt");
+            _httpMessageHandler.SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>())
+                .Returns(new HttpResponseMessage() { StatusCode = HttpStatusCode.InternalServerError });
+
+            var result = await _ecoBeePinAuthProvider.GetAuthHeaderAsync(CancellationToken.None);
+
+            Assert.Null(result);
+            _httpMessageHandler.Received(1)
+                .SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>());
         }
 
         [Fact]

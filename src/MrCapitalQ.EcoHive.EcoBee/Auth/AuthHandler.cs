@@ -1,6 +1,4 @@
-﻿using System.Net;
-
-namespace MrCapitalQ.EcoHive.EcoBee.Auth
+﻿namespace MrCapitalQ.EcoHive.EcoBee.Auth
 {
     public class AuthHandler : DelegatingHandler
     {
@@ -18,7 +16,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
                 request.Headers.Authorization = authHeader;
 
             var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            if (!response.IsSuccessStatusCode)
                 _authProvider.ClearCached();
 
             return response;
@@ -31,7 +29,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
                 request.Headers.Authorization = authHeader;
 
             var response = base.Send(request, cancellationToken);
-            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            if (!response.IsSuccessStatusCode)
                 _authProvider.ClearCached();
 
             return response;

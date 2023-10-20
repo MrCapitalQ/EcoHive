@@ -52,7 +52,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
         {
             var authData = await RequestAccessTokenAsync(authCode).ConfigureAwait(false);
 
-            return !string.IsNullOrEmpty(authData.AccessToken);
+            return authData is not null;
         }
 
         public async Task<AuthenticationHeaderValue?> GetAuthHeaderAsync(CancellationToken cancellationToken)
@@ -74,10 +74,19 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
 
         public void ClearCached() => _authCache.Invalidate();
 
-        private async Task<EcoBeeAuthTokenData> RequestAccessTokenAsync(string authCode)
+        private async Task<EcoBeeAuthTokenData?> RequestAccessTokenAsync(string authCode)
         {
             var url = $"https://api.ecobee.com/token?grant_type=ecobeePin&code={authCode}&client_id={_apiKey}&ecobee_type=jwt";
-            var responseMessage = await _httpClient.PostAsJsonAsync(url, new object()).ConfigureAwait(false);
+            using var responseMessage = await _httpClient.PostAsJsonAsync(url, new object()).ConfigureAwait(false);
+            if (!responseMessage.IsSuccessStatusCode)
+            {
+                _logger.LogError("Failed to request access token with response status {StatusCode} ({Status}).\n\r{Body}",
+                    (int)responseMessage.StatusCode,
+                    responseMessage.StatusCode,
+                    await responseMessage.Content.ReadAsStringAsync().ConfigureAwait(false));
+                return null;
+            }
+
             var tokenResponse = await responseMessage.Content.ReadFromJsonAsync<TokenResponse>().ConfigureAwait(false)
                 ?? throw new EcoBeeClientAuthException("Unexpected root literal null response when requesting an access token.");
 
@@ -86,7 +95,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
             return await CacheAuthToken(tokenResponse).ConfigureAwait(false);
         }
 
-        private async Task<EcoBeeAuthTokenData> RefreshAccessTokenAsync(string refreshToken)
+        private async Task<EcoBeeAuthTokenData?> RefreshAccessTokenAsync(string refreshToken)
         {
             await s_semaphore.WaitAsync();
             try
@@ -98,7 +107,16 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
                 _logger.LogInformation("Refreshing access token.");
 
                 var url = $"https://api.ecobee.com/token?grant_type=refresh_token&refresh_token={refreshToken}&client_id={_apiKey}&ecobee_type=jwt";
-                var responseMessage = await _httpClient.PostAsJsonAsync(url, new object()).ConfigureAwait(false);
+                using var responseMessage = await _httpClient.PostAsJsonAsync(url, new object()).ConfigureAwait(false);
+                if (!responseMessage.IsSuccessStatusCode)
+                {
+                    _logger.LogError("Failed to refresh access token with response status {StatusCode} ({Status}).\n\r{Body}",
+                        (int)responseMessage.StatusCode,
+                        responseMessage.StatusCode,
+                        await responseMessage.Content.ReadAsStringAsync().ConfigureAwait(false));
+                    return null;
+                }
+
                 var tokenResponse = await responseMessage.Content.ReadFromJsonAsync<TokenResponse>().ConfigureAwait(false)
                     ?? throw new EcoBeeClientAuthException("Unexpected root literal null response when refreshing the access token.");
                 return await CacheAuthToken(tokenResponse).ConfigureAwait(false);
