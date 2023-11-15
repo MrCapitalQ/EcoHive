@@ -30,7 +30,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore
             services.AddHttpClient<IEcoBeeThermostatClient, EcoBeeThermostatClient>()
                 .AddHttpMessageHandler<AuthHandler>();
 
-            services.TryAddSingleton<TimeProvider>();
+            services.TryAddSingleton(TimeProvider.System);
             services.TryAddTransient<IEcoBeeAuthCache, EcoBeeAuthCache>();
             services.TryAddTransient<IEcoBeeRefreshTokenStore, EcoBeeRefreshTokenStore>();
             services.TryAddTransient<IEcoBeeAuthProvider>(s => s.GetRequiredService<IEcoBeePinAuthProvider>());
