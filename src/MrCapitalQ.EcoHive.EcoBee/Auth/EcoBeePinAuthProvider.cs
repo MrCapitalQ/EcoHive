@@ -11,21 +11,21 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
         private static readonly SemaphoreSlim s_semaphore = new(1);
 
         private readonly HttpClient _httpClient;
-        private readonly IDateTimeProvider _dateTimeProvider;
+        private readonly TimeProvider _timeProvider;
         private readonly IEcoBeeAuthCache _authCache;
         private readonly IEcoBeeRefreshTokenStore _refreshTokenStore;
         private readonly string _apiKey;
         private readonly ILogger<EcoBeePinAuthProvider> _logger;
 
         public EcoBeePinAuthProvider(HttpClient httpClient,
-            IDateTimeProvider dateTimeProvider,
+            TimeProvider timeProvider,
             IEcoBeeAuthCache authCache,
             IEcoBeeRefreshTokenStore refreshTokenStore,
             string apiKey,
             ILogger<EcoBeePinAuthProvider> logger)
         {
             _httpClient = httpClient;
-            _dateTimeProvider = dateTimeProvider;
+            _timeProvider = timeProvider;
             _authCache = authCache;
             _refreshTokenStore = refreshTokenStore;
             _apiKey = apiKey;
@@ -44,7 +44,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Auth
                 Pin = pinResponse.EcobeePin,
                 AuthCode = pinResponse.Code,
                 Scope = pinResponse.Scope,
-                Expiration = _dateTimeProvider.UtcNow().AddMinutes(pinResponse.ExpiresIn)
+                Expiration = _timeProvider.GetUtcNow().AddMinutes(pinResponse.ExpiresIn)
             };
         }
 

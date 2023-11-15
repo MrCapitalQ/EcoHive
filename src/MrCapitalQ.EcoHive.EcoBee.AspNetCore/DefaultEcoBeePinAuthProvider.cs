@@ -9,13 +9,13 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore
     internal class DefaultEcoBeePinAuthProvider : EcoBeePinAuthProvider
     {
         public DefaultEcoBeePinAuthProvider(HttpClient httpClient,
-            IDateTimeProvider dateTimeProvider,
+            TimeProvider timeProvider,
             IEcoBeeAuthCache authCache,
             IEcoBeeRefreshTokenStore refreshTokenStore,
             IOptionsSnapshot<EcoBeeClientOptions> options,
             ILogger<EcoBeePinAuthProvider> logger)
             : base(httpClient,
-                  dateTimeProvider,
+                  timeProvider,
                   authCache,
                   refreshTokenStore,
                   options.Value.ApiKey,

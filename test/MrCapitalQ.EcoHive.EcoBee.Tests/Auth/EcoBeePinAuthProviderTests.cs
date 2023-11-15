@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using MrCapitalQ.EcoHive.EcoBee.Auth;
 using MrCapitalQ.EcoHive.EcoBee.Exceptions;
 using System.Net;
@@ -15,7 +16,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
         private readonly SubstituteHandler _httpMessageHandler;
         private readonly HttpClient _httpClient;
         private readonly DateTimeOffset _now = DateTimeOffset.UtcNow;
-        private readonly IDateTimeProvider _dateTimeProvider;
+        private readonly FakeTimeProvider _timeProvider;
         private readonly IEcoBeeAuthCache _authCache;
         private readonly IEcoBeeRefreshTokenStore _refreshTokenStore;
         private readonly ILogger<EcoBeePinAuthProvider> _logger;
@@ -26,14 +27,14 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
         {
             _httpMessageHandler = HttpSubstitute.ForHandler();
             _httpClient = new(_httpMessageHandler);
-            _dateTimeProvider = Substitute.For<IDateTimeProvider>();
-            _dateTimeProvider.UtcNow().Returns(_now);
+            _timeProvider = Substitute.ForPartsOf<FakeTimeProvider>();
+            _timeProvider.SetUtcNow(_now);
             _authCache = Substitute.For<IEcoBeeAuthCache>();
             _refreshTokenStore = Substitute.For<IEcoBeeRefreshTokenStore>();
             _logger = Substitute.For<ILogger<EcoBeePinAuthProvider>>();
 
             _ecoBeePinAuthProvider = new EcoBeePinAuthProvider(_httpClient,
-                _dateTimeProvider,
+                _timeProvider,
                 _authCache,
                 _refreshTokenStore,
                 ApiKey,
@@ -70,6 +71,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             Assert.Equal(expected, actual);
             _httpMessageHandler.Received(1)
                 .SendSubstitute(HttpArg.IsRequest(HttpMethod.Get, requestUri), Arg.Any<CancellationToken>());
+            _timeProvider.Received(1).GetUtcNow();
         }
 
         [Fact]
