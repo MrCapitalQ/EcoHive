@@ -9,7 +9,6 @@ Restart=always
 RestartSec=5
 KillSignal=SIGINT
 SyslogIdentifier=EcoHive
-User=q
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
 

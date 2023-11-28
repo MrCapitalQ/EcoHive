@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <IncludeOpenAPIAnalyzers>true</IncludeOpenAPIAnalyzers>
+    <PublishSingleFile>true</PublishSingleFile>
     <UserSecretsId>1f0734dd-95b1-427c-a6bf-9b9f79d55fcb</UserSecretsId>
   </PropertyGroup>
 

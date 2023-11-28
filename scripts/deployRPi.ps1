@@ -1,5 +1,9 @@
 $publishDirectory = ".\src\MrCapitalQ.EcoHive.Api\bin\Release\net8.0\linux-arm64\publish"
+$deployDirectory = "/var/www/EcoHive"
+$sshUser = "q"
+$sshHostName = "raspberrypi"
 
+$sshDeployTarget = "$sshUser@$sshHostName"
 $currentDir = Get-Location
 
 try {
@@ -10,7 +14,7 @@ try {
     Remove-Item -LiteralPath $publishDirectory -Force -Recurse -ErrorAction Ignore
 
     # Build and publish app for Raspberry Pi OS 64 bit.
-    dotnet publish .\src\MrCapitalQ.EcoHive.Api --configuration Release --runtime linux-arm64 --self-contained
+    dotnet publish .\src\MrCapitalQ.EcoHive.Api --configuration Release --runtime linux-arm64 --self-contained true
     if (!$?) { Exit $LASTEXITCODE }
 
     # Create EF Core migration bundle for Raspberry Pi OS 64 bit.
@@ -23,15 +27,19 @@ try {
     # Include service definition file in publish directory.
     Copy-Item .\infra\linux\configure.sh $publishDirectory
 
-    # Copy publish directory to Raspberry Pi deploy destination
-    scp -r $publishDirectory\* q@raspberrypi:/var/www/EcoHive
+    # Stop existing sevice
+    ssh $sshDeployTarget "sudo systemctl stop kestrel-ecohive.service"
+    
+    # Ensure deploy destination exists
+    ssh $sshDeployTarget "sudo mkdir -p $deployDirectory && sudo chown $sshUser $deployDirectory"
     if (!$?) { Exit $LASTEXITCODE }
 
-    # SSH into Raspberry Pi and execute the following command
-    # sudo bash /var/www/EcoHive/configure.sh
-    Write-Host "Build and file transfer complete." -ForegroundColor green
-    Write-Host "To complete the deployment, SSH into the Raspberry Pi and execute the following:" -ForegroundColor green
-    Write-Host "    sudo bash /var/www/EcoHive/configure.sh" -ForegroundColor yellow
+    # Copy publish directory to Raspberry Pi deploy destination
+    scp -r $publishDirectory\* "$($sshDeployTarget):$deployDirectory"
+    if (!$?) { Exit $LASTEXITCODE }
+
+    # Run script to configure service
+    ssh $sshDeployTarget "bash $deployDirectory/configure.sh"
 }
 finally {
     # Return to original directory
