@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
 using MrCapitalQ.EcoHive.EcoBee.Auth;
 using MrCapitalQ.EcoHive.EcoBee.Exceptions;
@@ -19,7 +19,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
         private readonly FakeTimeProvider _timeProvider;
         private readonly IEcoBeeAuthCache _authCache;
         private readonly IEcoBeeRefreshTokenStore _refreshTokenStore;
-        private readonly ILogger<EcoBeePinAuthProvider> _logger;
+        private readonly FakeLogger<EcoBeePinAuthProvider> _logger;
 
         private readonly EcoBeePinAuthProvider _ecoBeePinAuthProvider;
 
@@ -31,7 +31,7 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             _timeProvider.SetUtcNow(_now);
             _authCache = Substitute.For<IEcoBeeAuthCache>();
             _refreshTokenStore = Substitute.For<IEcoBeeRefreshTokenStore>();
-            _logger = Substitute.For<ILogger<EcoBeePinAuthProvider>>();
+            _logger = new();
 
             _ecoBeePinAuthProvider = new EcoBeePinAuthProvider(_httpClient,
                 _timeProvider,
@@ -180,6 +180,9 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             var result = await _ecoBeePinAuthProvider.GetAuthHeaderAsync(CancellationToken.None);
 
             Assert.Equal(new AuthenticationHeaderValue(tokenResponseBody.token_type, tokenResponseBody.access_token), result);
+            var loggerSnapshot = _logger.Collector.GetSnapshot();
+            Assert.Single(loggerSnapshot);
+            Assert.Equal("Refreshing access token.", loggerSnapshot[0].Message);
             _httpMessageHandler.Received(1)
                 .SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>());
         }
@@ -250,6 +253,9 @@ namespace MrCapitalQ.EcoHive.EcoBee.Tests.Auth
             var ex = await Assert.ThrowsAsync<EcoBeeClientAuthException>(() => _ecoBeePinAuthProvider.GetAuthHeaderAsync(CancellationToken.None));
 
             Assert.Equal("Unexpected root literal null response when refreshing the access token.", ex.Message);
+            var loggerSnapshot = _logger.Collector.GetSnapshot();
+            Assert.Single(loggerSnapshot);
+            Assert.Equal("Refreshing access token.", loggerSnapshot[0].Message);
             _httpMessageHandler.Received(1)
                 .SendSubstitute(HttpArg.IsRequest(HttpMethod.Post, requestUri), Arg.Any<CancellationToken>());
         }
