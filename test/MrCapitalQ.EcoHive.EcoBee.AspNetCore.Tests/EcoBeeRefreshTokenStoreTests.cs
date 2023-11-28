@@ -1,27 +1,26 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore.Tests
 {
-    public sealed class EcoBeeRefreshTokenStoreTests : IDisposable
+    public sealed class EcoBeeRefreshTokenStoreTests : IClassFixture<DatabaseFixture>, IAsyncLifetime
     {
-        private readonly SqliteConnection _connection;
         private readonly EcoBeeContext _dbContext;
 
         private readonly EcoBeeRefreshTokenStore _store;
 
-        public EcoBeeRefreshTokenStoreTests()
+        public EcoBeeRefreshTokenStoreTests(DatabaseFixture fixture)
         {
-            _connection = new SqliteConnection("Filename=:memory:");
-            _connection.Open();
             var options = new DbContextOptionsBuilder<EcoBeeContext>()
-                .UseSqlite(_connection)
+                .UseSqlite(fixture.Connection)
                 .Options;
-            _dbContext = new EcoBeeContext(options);
-            _dbContext.Database.EnsureCreated();
+            _dbContext = new(options);
 
-            _store = new EcoBeeRefreshTokenStore(_dbContext);
+            _store = new(_dbContext);
         }
+
+        public Task InitializeAsync() => _dbContext.Database.EnsureCreatedAsync();
+
+        public Task DisposeAsync() => _dbContext.Database.EnsureDeletedAsync();
 
         [Fact]
         public async Task GetAsync_NoRefreshTokenEntries_ReturnsNull()
@@ -62,11 +61,6 @@ namespace MrCapitalQ.EcoHive.EcoBee.AspNetCore.Tests
             var record = await _dbContext.RefreshTokens.SingleAsync();
             Assert.Equal(expected.Id, record.Id);
             Assert.Equal(expected.Token, record.Token);
-        }
-
-        public void Dispose()
-        {
-            _connection.Dispose();
         }
     }
 }
