@@ -10,6 +10,7 @@ RestartSec=5
 KillSignal=SIGINT
 SyslogIdentifier=EcoHive
 Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://*:5281
 Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
 
 [Install]
